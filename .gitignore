@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+
+# 环境与密钥（绝不提交）
+.env
+.env.*
+
+# 测试与工具缓存
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# macOS
+.DS_Store
+
+# uv
+# uv.lock 要提交（锁版本是工程纪律），不忽略
