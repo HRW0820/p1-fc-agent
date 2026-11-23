@@ -37,3 +37,11 @@
 - **修复**：包进 `async def main(): ...`，再用 `asyncio.run(main())` 从外部点火——`asyncio.run` 就是"异步世界"唯一的入口
 - **教训**：异步代码是"两层世界"——外层同步世界靠 `asyncio.run` 进内层异步世界；一个程序通常只点火一次（pytest 每用例各调一次是特例）
 
+## P006 · 2026-11-23 · 在源头吞掉本该上抛的异常（分层合同违反）
+
+- **现象**：`test_timeout_raises` 失败（`pytest.raises(TimeoutError)` 没等到异常）；`fetch_with_timeout` 里写了 `except TimeoutError: return "超时"`，还有一处 `zip(labels, ...)` 引用未定义变量
+- **根因**：没想清楚**分层合同**——wait_for 层的职责就是"抛出 TimeoutError 作为 retry 层的原料"，源头把它吃掉，retry 层瞬间无活可干，三层架构塌成一层；labels 则是想用了才发现没人定义
+- **修复**：删掉 try/except 让异常自然上抛；`labels = [label for label, _ in calls]` 从入参拆出
+- **附**：第二版错误串 `f"工具异常: {label}: {r}"` 缺 `{type(r).__name__}`——`str(异常)` 只有消息没有类型名，模型失去"改参数还是换工具"的纠错线索
+- **教训**：分层设计先写清楚每层的输入/输出契约（**谁抛、谁捕、谁转**），异常处理放错层是韧性层最常见的真实错误；TDD 的合同测试就是抓这种违约的——4 个红测试精确定位了 3 个合同违反点
+
