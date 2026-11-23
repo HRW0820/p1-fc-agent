@@ -59,4 +59,4 @@ def run_calculator(expression: str) -> str:
     except ValidationError as e:
         return format_validation_error(e)
     except Exception as e:
-        return f"参数校验失败: expression: {e}"
+        return f"工具执行失败: expression: {e}"
