@@ -23,3 +23,17 @@
 - **修复**：区分"拒绝"与"智能转换"——v2 里 `str` 字段收 int = 拒绝；`float` 字段收 int、`list[int]` 收 str 列表 = 转换
 - **教训**：版本敏感的知识（库的默认行为）必须用当前版本跑通验证再写进文档；"终端输出 > 教程说法 > 记忆"——AI 生成的内容同样要跑一遍才知道真假
 
+## P004 · 2026-11-23 · 调用 async 函数忘了 await（coroutine never awaited）
+
+- **现象**：`async_demo.py` 结尾 `lazy = fetch_weather("杭州", delay=0.1)` 只调用没 await，程序结束时抛 `RuntimeWarning: coroutine 'fetch_weather' was never awaited`
+- **根因**：`async def` 函数调用**不执行**，只返回 coroutine"懒"对象——造了单但没下锅。懒是并发的地基（可以一次造三个再 gather 点火），但代价是"忘了点火"不报错、只警告
+- **修复**：任何 coroutine 对象必须被 `await`（单个）或交给 `gather(*coros)`（一批）
+- **教训**：S4 的串行测试设了耗时下限断言（≥0.85s）专门抓这个坑——忘 await 的函数会"瞬间跑完"，结果列表里全是懒对象。看到 RuntimeWarning = 有任务没执行，别忽略它
+
+## P005 · 2026-11-23 · 脚本顶层裸写 await 直接 SyntaxError
+
+- **现象**：在普通 `.py` 脚本顶层写 `await asyncio.gather(...)`，得到 `SyntaxError: 'await' outside function`
+- **根因**：`await` 只能在协程函数体内出现；脚本顶层的普通代码不在任何事件循环里，无处让出控制权
+- **修复**：包进 `async def main(): ...`，再用 `asyncio.run(main())` 从外部点火——`asyncio.run` 就是"异步世界"唯一的入口
+- **教训**：异步代码是"两层世界"——外层同步世界靠 `asyncio.run` 进内层异步世界；一个程序通常只点火一次（pytest 每用例各调一次是特例）
+
