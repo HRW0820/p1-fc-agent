@@ -45,3 +45,10 @@
 - **附**：第二版错误串 `f"工具异常: {label}: {r}"` 缺 `{type(r).__name__}`——`str(异常)` 只有消息没有类型名，模型失去"改参数还是换工具"的纠错线索
 - **教训**：分层设计先写清楚每层的输入/输出契约（**谁抛、谁捕、谁转**），异常处理放错层是韧性层最常见的真实错误；TDD 的合同测试就是抓这种违约的——4 个红测试精确定位了 3 个合同违反点
 
+## P007 · 2026-11-23 · 顶层直接调 gather：没有事件循环
+
+- **现象**：实验脚本写 `asyncio.run(asyncio.gather(a, b))` → `RuntimeError: There is no current event loop in thread 'MainThread'`，且伴随 never awaited 警告
+- **根因**：`gather()` **被调用的那一刻**就需要事件循环来调度任务（内部 ensure_future 要找当前循环），而 `asyncio.run` 的循环在它内部才诞生——外层调用时循环还不存在
+- **修复**：把 gather 写进协程函数体内：`async def main(): return await asyncio.gather(...)`，再 `asyncio.run(main())`
+- **教训**：与 P005（顶层 await SyntaxError）同源——**进入异步世界的门只有 asyncio.run，门内才能用异步设施**；`run(coro)` 收的是协程，不是"已调度的 gather 结果"
+
