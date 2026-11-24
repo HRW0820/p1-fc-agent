@@ -52,3 +52,10 @@
 - **修复**：把 gather 写进协程函数体内：`async def main(): return await asyncio.gather(...)`，再 `asyncio.run(main())`
 - **教训**：与 P005（顶层 await SyntaxError）同源——**进入异步世界的门只有 asyncio.run，门内才能用异步设施**；`run(coro)` 收的是协程，不是"已调度的 gather 结果"
 
+## P008 · 2026-11-24 · 字段校验器写在类外面（IndentationError）
+
+- **现象**：`pytest` 收集阶段直接报 `app.py, line 20 @classmethod IndentationError: unexpected indent`
+- **根因**：`@field_validator` 写在了 `/echo` 路由**之后、且顶格**。Python 里类的身体靠缩进划定——`class EchoRequest` 下面第一次出现顶格代码（路由装饰器）时，类就"关门"了；后面的校验器实际挂在模块顶层，不属于任何类，而第 20 行又突然缩进 4 格，Python 不知道它是谁的
+- **修复**：①校验器整段搬进类体（与 `message`/`repeat` 字段对齐，同缩进一层）②路由挪到类完整定义之后 ③顺手补 `from pydantic import field_validator`（修完前两条会撞 NameError）
+- **教训**：**报错行号是"发现现场"不是"肇事现场"**——第 20 行没错，错在第 19 行的归属；"依赖某个类的东西必须定义在类关门之前"是通用的顺序规则。另一个信号：ImportError/IndentationError 发生在**收集阶段**（整文件一个测试都没跑），看到 `ERROR collecting` 就知道是模块级语法/导入问题，不是断言问题
+
