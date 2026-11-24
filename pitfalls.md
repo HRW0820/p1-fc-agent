@@ -59,3 +59,10 @@
 - **修复**：①校验器整段搬进类体（与 `message`/`repeat` 字段对齐，同缩进一层）②路由挪到类完整定义之后 ③顺手补 `from pydantic import field_validator`（修完前两条会撞 NameError）
 - **教训**：**报错行号是"发现现场"不是"肇事现场"**——第 20 行没错，错在第 19 行的归属；"依赖某个类的东西必须定义在类关门之前"是通用的顺序规则。另一个信号：ImportError/IndentationError 发生在**收集阶段**（整文件一个测试都没跑），看到 `ERROR collecting` 就知道是模块级语法/导入问题，不是断言问题
 
+## P009 · 2026-11-24 · 从 FastAPI 内部模块导入自己写的函数（ImportError）
+
+- **现象**：`pytest` 收集阶段报 `ImportError: cannot import name 'format_validation_error' from 'fastapi.utils'`
+- **根因**：`format_validation_error` 是 W1-S3 自己写在 `p1_fc_agent/tools.py` 里的函数，不是 FastAPI 的。用 AI 工具补全时，它看到"validation error"就猜成了 FastAPI 内部模块（`fastapi.utils`）
+- **修复**：删掉 `from fastapi.utils import format_validation_error`，改为 `from p1_fc_agent.tools import ..., format_validation_error`
+- **教训**：①**两种导入错误要分清**——`ModuleNotFoundError` 是"房子都不在"（模块路径错），`ImportError: cannot import name` 是"房子在，人不在"（模块对，名字错），后者先查"这个名字到底住在哪" ②**AI 生成的 import 行要逐个核对来源**：自己项目里的名字从自己的包导入，看到 `xxx.utils` / `xxx._internal` 这种内部模块路径要先停一下（AI Coding 纪律：每行都能解释） ③报错发生在收集阶段，整文件一个测试都没跑（P008 同款信号）
+

@@ -1,7 +1,12 @@
 # 最小 FastAPI 应用
-from fastapi import FastAPI
-from pydantic import BaseModel, Field
-from pydantic import field_validator
+from fastapi import FastAPI,HTTPException, Header, Depends
+from pydantic import BaseModel, Field, field_validator
+from p1_fc_agent.tools import WeatherQuery, PopulationQuery, CalcQuery, run_calculator, format_validation_error
+import os
+from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi import Request
 
 
 app = FastAPI(title="demo")
@@ -26,3 +31,55 @@ class EchoRequest(BaseModel):
 @app.post("/echo")
 async def echo(req: EchoRequest):
     return {"message": req.message, "repeat": req.repeat}
+
+
+TOOLS = {
+    "weather": ("查城市天气", WeatherQuery),
+    "population": ("查城市人口", PopulationQuery),
+    "calculator": ("四则运算", CalcQuery),
+}
+
+@app.get("/tools/{tool_name}")
+async def tool_info(tool_name: str):              # 路径参数：/tools/weather 里的 "weather"
+    if tool_name not in TOOLS:
+        raise HTTPException(status_code=404, detail=f"未知工具: {tool_name}，可用: {', '.join(sorted(TOOLS))}")
+    description, model = TOOLS[tool_name]
+    return {"name": tool_name, "description": description, "parameters": model.model_json_schema()}
+
+#@app.post("/calculator")
+#async def calculator(req: CalcQuery):
+#    return {"result": run_calculator(req.expression)}
+
+# ① 配置：服务从哪读"正确的 key"
+class Settings(BaseModel):
+    api_key: str
+
+def get_settings() -> Settings:
+    return Settings(api_key=os.environ.get("P1_API_KEY", "dev-key"))
+
+# ② 查卡函数：它自己也需要 ①，所以参数里又写了一个 Depends —— 依赖可以套依赖
+async def require_api_key(
+    x_api_key: str | None = Header(default=None),              # 从请求头里取 X-API-Key
+    settings: Settings = Depends(get_settings),                # "我需要配置"
+) -> None:
+    if x_api_key != settings.api_key:
+        raise HTTPException(status_code=401, detail="无效的 API Key")
+
+# ③ 路由：声明"我需要查卡"，返回值不要（下划线）
+@app.post("/calculator")
+async def calculator(req: CalcQuery, _: None = Depends(require_api_key)):
+    return {"result": run_calculator(req.expression)}
+
+async def readable_validation_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={"detail": jsonable_encoder(exc.errors()),       # 原有的结构照旧保留
+                 "message": format_validation_error(exc)},      # 新增：一句人话
+    )
+
+app.add_exception_handler(RequestValidationError, readable_validation_handler)
+
+async def unhandled_error_handler(request: Request, exc: Exception):
+    return JSONResponse(status_code=500, content={"detail": "服务器内部错误"})
+
+app.add_exception_handler(Exception, unhandled_error_handler)
