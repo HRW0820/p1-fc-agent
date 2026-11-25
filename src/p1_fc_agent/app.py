@@ -7,6 +7,9 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi import Request
+from fastapi.responses import StreamingResponse
+from p1_fc_agent.sse import sse, token_stream
+
 
 
 app = FastAPI(title="demo")
@@ -83,3 +86,19 @@ async def unhandled_error_handler(request: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"detail": "服务器内部错误"})
 
 app.add_exception_handler(Exception, unhandled_error_handler)
+
+class StreamRequest(BaseModel):
+    text: str = Field(min_length=1)
+    delay: float = Field(default=0.05, ge=0, le=1)
+    model_config = {"extra": "forbid"}
+
+    @field_validator("text")
+    @classmethod
+    def not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("text 不能是空白")
+        return v
+@app.post("/stream")
+async def stream(req: StreamRequest):
+    return StreamingResponse(token_stream(req.text, req.delay), media_type="text/event-stream",
+                         headers={"Cache-Control": "no-cache"})

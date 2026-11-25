@@ -66,3 +66,10 @@
 - **修复**：删掉 `from fastapi.utils import format_validation_error`，改为 `from p1_fc_agent.tools import ..., format_validation_error`
 - **教训**：①**两种导入错误要分清**——`ModuleNotFoundError` 是"房子都不在"（模块路径错），`ImportError: cannot import name` 是"房子在，人不在"（模块对，名字错），后者先查"这个名字到底住在哪" ②**AI 生成的 import 行要逐个核对来源**：自己项目里的名字从自己的包导入，看到 `xxx.utils` / `xxx._internal` 这种内部模块路径要先停一下（AI Coding 纪律：每行都能解释） ③报错发生在收集阶段，整文件一个测试都没跑（P008 同款信号）
 
+## P010 · 2026-11-25 · 把带 `#` 说明行的命令整块粘进终端（zsh: command not found: #）
+
+- **现象**：把讲义里五条 `curl` 连同 `# ① 响应头……` 这样的说明行一起复制进终端，每条说明行报一次 `zsh: command not found: #`，`curl` 本身照常执行、结果正确
+- **根因**：`#` 开头是写给人看的注释。zsh 在交互模式下默认**不把 `#` 当注释**，而是当成一个名字叫 `#` 的命令去找，找不到就报错。整块粘贴时说明行和命令行一起被送进去，所以报错和正常输出交替出现
+- **修复**：只复制 `curl` 那一行。讲义已改成一条命令一个代码块，说明文字写在代码块外
+- **教训**：①**报错要看它有没有影响结果**：这次是无害噪音（三条 `command not found`，结果全对），和"报错导致命令没跑"是两回事，先看输出再决定要不要慌 ②**复制粘贴的最小单位是一条命令**，不是一段代码块 ③让 zsh 承认交互式 `#` 注释的开关是 `setopt interactivecomments`（写进 `~/.zshrc`），这个没有实测，优先还是养成只粘命令的习惯
+
