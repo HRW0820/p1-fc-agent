@@ -9,6 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi import Request
 from fastapi.responses import StreamingResponse
 from p1_fc_agent.sse import sse, token_stream
+from p1_fc_agent.react_loop import react_events, mock_llm
 
 
 
@@ -102,3 +103,26 @@ class StreamRequest(BaseModel):
 async def stream(req: StreamRequest):
     return StreamingResponse(token_stream(req.text, req.delay), media_type="text/event-stream",
                          headers={"Cache-Control": "no-cache"})
+
+class AskRequest(BaseModel):
+    question: str = Field(min_length=1)
+    model_config = {"extra": "forbid"}
+
+    @field_validator("question")
+    @classmethod
+    def not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("question 不能是空白")
+        return v
+    
+async def ask_stream(question: str, *, brain=mock_llm):
+    """把循环的每一条事件包成一条 SSE。brain 可以换：W3 换真模型只改这里"""
+    async for event in react_events(question, brain=brain):     # 边跑边拿
+        yield sse(event)                                          # 包好，递到传送带上
+    yield sse({"type": "done"})                                  # 收尾：菜上齐了                            # 收尾：菜上齐了
+
+
+@app.post("/ask")
+async def ask(req: AskRequest):
+    return StreamingResponse(ask_stream(req.question), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache"})
