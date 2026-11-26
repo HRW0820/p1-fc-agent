@@ -92,3 +92,18 @@
 - **修复**：今天不修，假大脑用不上问题。W3 换真模型的第一步补**提示词模板**：把问题、有哪些工具能用、输出格式要求、之前的草稿纸拼在一起交给大脑
 - **教训**：①一个参数从入口一路传到底却没被用上，Python 不报错，测试也不报错 ②测试只问了一个问题，所以发现不了"答案和问题无关"。要有一条"换问题、答案跟着变"的用例，等 W3 真大脑能读到问题后补 ③接口"能跑通、内容对"和"真的在处理输入"是两回事，验收时要故意换一个不相干的输入试试
 
+## P014 · 2026-11-26 · OpenAI SDK 漏写 `base_url`：DeepSeek 的 key 被发到了 OpenAI 的服务器
+
+- **现象**：接 DeepSeek 时写 `AsyncOpenAI(api_key=...)`，漏了 `base_url`。请求没有发到 DeepSeek，回的是 `openai.AuthenticationError: Error code: 401 - Incorrect API key provided…`。这一条是助手备课时在实验脚本里犯的，**用的是真 key**，当天已告知
+- **根因**：OpenAI SDK 出厂默认连 OpenAI 自己的服务器。`api_key` 只是一个字符串，SDK 不知道它属于谁，照样放进 `Authorization` 头发出去。key 发给谁由 `base_url` 决定，和 key 本身无关
+- **修复**：`post` 里写明 `AsyncOpenAI(base_url=BASE_URL, api_key=load_api_key())`。实验一律用假 key，或在不含 `.env` 的副本里做
+- **教训**：①用第三方兼容接口，第一件事是核对地址，和核对 key 一样要紧 ②**别用真 key 做"写错的现场"实验**，写错的那个地方可能正好是"发给谁" ③同源的一条（实测）：在副本里删掉规格的 `isolated_env` 夹具、终端里又导出了真 key 时，pytest 的断言对比把真 key 打到了屏幕上。真 key 只该出现在 `.env` 里，测试永远读不到它，就不会被任何输出带出来
+- **后续**：是否更换 key 由用户决定；换的话只改 `.env` 那一行
+
+## P015 · 2026-11-26 · `chat` 只回 `content`，丢了 `finish_reason`：回复被掐断甚至为空，调用方无从知道
+
+- **现象**：把 `chat` 里的思考打开（`"thinking": {"type": "enabled"}`），`max_tokens` 还是默认的 256。实测 6 遍里 4 遍输出正好 256 个 token，`finish_reason` 是 `length`，其中 1 遍 `content` 是空字符串 `''`，3 遍话说一半停住。而 `chat` 返回的是 `('', 用量)`，和一次正常回答长得一样。8 条测试全绿
+- **根因**：`chat` 只取 `choices[0].message.content` 和 `usage`。`max_tokens` 是思考和回答**共用**的额度，思考长了回答就是空的；关闭思考时它也会发生：`max_tokens` 设 5 时回执是 `"content":"长城是中国古代为抵御"`、`"finish_reason":"length"`。规格里的 `FakeSend` 回的 `finish_reason` 永远是 `"stop"`，所以测试看不见这件事
+- **修复**：没修。W3 解析模型输出那一课要把 `finish_reason` 一起带出来：是 `"length"` 就重试或报错，不能把半句话、空字符串当答案
+- **教训**：①**模型回了非空的字符串，不等于说完了**。生产里的 Agent 必须看 `finish_reason`，不能只看 `content` 非空 ②被掐断的半句话进了 ReAct 循环有两条路：没有 `Action:` 就走"格式错误"分支，在草稿纸里越滚越乱；掐在 `Final Answer:` 后面就更坏，循环当场收工，把半句话当答案交给客人 ③和 P011–P013 是同一家族：测试全绿，东西却不对。假的 `send` 测不到 `post`，也测不到真模型会话说到一半
+
