@@ -26,6 +26,10 @@ p1-fc-agent/
 - API key 一律放 `.env`，**绝不进仓库**（`.gitignore` 已配置）
 - 提交前自查 `git diff` 里有没有密钥
 
+## 配置模型 key
+
+第一次运行前，在仓库根目录新建 `.env`，写一行 `DEEPSEEK_API_KEY=你的key`。这个文件已在 `.gitignore` 里，不会被提交。
+
 ## 快速开始
 
 ```bash
@@ -54,6 +58,10 @@ Agent 每走一步，就推一条 SSE 事件：`step`（Thought + Action）、`o
 | POST | /calculator | 四则运算，需要请求头 `X-API-Key`（W2-S2） |
 | POST | /stream | 把一段文字逐字推流（W2-S3） |
 | POST | /ask | ReAct Agent：流式返回每一步 Thought/Action/Observation（W2 周末） |
+
+## 真模型调用（W3）
+
+`src/p1_fc_agent/llm.py` 是调 DeepSeek 的最小封装：`load_api_key()` 读 key，`chat(messages)` 发一段对话并返回 `(回复, 用量)`，`cost(usage)` 按空闲时段单价算出这次调用花了多少元。单价来自 DeepSeek 官方价格页，高峰时段（工作日 9-12 点、14-18 点）是两倍。
 
 ## 测试
 
