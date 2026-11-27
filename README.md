@@ -63,6 +63,8 @@ Agent 每走一步，就推一条 SSE 事件：`step`（Thought + Action）、`o
 
 `src/p1_fc_agent/llm.py` 是调 DeepSeek 的最小封装：`load_api_key()` 读 key，`chat(messages)` 发一段对话并返回 `(回复, 用量)`，`cost(usage)` 按空闲时段单价算出这次调用花了多少元。单价来自 DeepSeek 官方价格页，高峰时段（工作日 9-12 点、14-18 点）是两倍。
 
+结构化输出在 `src/p1_fc_agent/structured.py`：`ask_json(messages, 表格)` 让模型按一张 Pydantic 表格回答（打开 JSON 模式），`parse(text, 表格)` 把回答变成对象。回答不是 JSON、表格没填对、话说一半被掐断，都报 `ParseError`，报错信息是一句能照着做的话。
+
 ## 测试
 
 ```bash
