@@ -25,12 +25,16 @@ async def post(payload: dict) -> dict:
     return resp.model_dump()                       # 整份响应变成字典：choices、usage 都在里面
 
 
-async def chat(messages: list[dict], *, send=post, max_tokens: int = 256, temperature: float = 0.0):
-    """发一段对话，返回 (回复文本, 用量)。send 可以换成假的：测试不花钱"""
+async def chat(messages: list[dict], *, send=post, max_tokens: int = 256, temperature: float = 0.0,
+               response_format: dict | None = None):
+    """发一段对话，返回 (回复文本, 用量, finish_reason)。send 可以换成假的：测试不花钱"""
     payload = {"model": MODEL, "messages": messages, "max_tokens": max_tokens,
-               "temperature": temperature, "thinking": {"type": "disabled"}}     # 关思考：只要回答，不要思考过程
+    "temperature": temperature, "thinking": {"type": "disabled"}}     # 关思考：只要回答，不要思考过程
+    if response_format:
+        payload["response_format"] = response_format      # 要 JSON 模式才带上；不带时请求体还是 W3-S1 的五样
     data = await send(payload)
-    return data["choices"][0]["message"]["content"], data["usage"]
+    choice = data["choices"][0]                       # 回执里的那条回复：内容、为什么停，都在它上面
+    return choice["message"]["content"], data["usage"], choice["finish_reason"]
 
 def cost(usage: dict, price: dict = PRICE) -> float:
     """这次调用花了多少元。usage 就是响应里的用量"""
