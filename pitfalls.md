@@ -104,7 +104,7 @@
 
 - **现象**：把 `chat` 里的思考打开（`"thinking": {"type": "enabled"}`），`max_tokens` 还是默认的 256。实测 6 遍里 4 遍输出正好 256 个 token，`finish_reason` 是 `length`，其中 1 遍 `content` 是空字符串 `''`，3 遍话说一半停住。而 `chat` 返回的是 `('', 用量)`，和一次正常回答长得一样。8 条测试全绿
 - **根因**：`chat` 只取 `choices[0].message.content` 和 `usage`。`max_tokens` 是思考和回答**共用**的额度，思考长了回答就是空的；关闭思考时它也会发生：`max_tokens` 设 5 时回执是 `"content":"长城是中国古代为抵御"`、`"finish_reason":"length"`。规格里的 `FakeSend` 回的 `finish_reason` 永远是 `"stop"`，所以测试看不见这件事
-- **修复**：没修。W3 解析模型输出那一课要把 `finish_reason` 一起带出来：是 `"length"` 就重试或报错，不能把半句话、空字符串当答案
+- **修复**：没修。W3 解析模型输出那一课要把 `finish_reason` 一起带出来：是 `"length"` 就重试或报错，不能把半句话、空字符串当答案。（2026-11-27 W3-S2 已还：`chat` 带出 `finish_reason`，`ask_json` 在解析之前先检查它，`test_chat_reports_finish_reason` 和 `test_ask_json_truncated_reply_raises` 守着）
 - **教训**：①**模型回了非空的字符串，不等于说完了**。生产里的 Agent 必须看 `finish_reason`，不能只看 `content` 非空 ②被掐断的半句话进了 ReAct 循环有两条路：没有 `Action:` 就走"格式错误"分支，在草稿纸里越滚越乱；掐在 `Final Answer:` 后面就更坏，循环当场收工，把半句话当答案交给客人 ③和 P011–P013 是同一家族：测试全绿，东西却不对。假的 `send` 测不到 `post`，也测不到真模型会话说到一半
 
 ## P016 · 2026-11-27 · 日志那一行没写、写错位置，88 条测试照样全绿
@@ -113,4 +113,11 @@
 - **根因**：规格只断言**客人收到什么**：事件的类型和顺序、`error` 的 `message` 里有没有泄漏。日志走的是 stderr，`TestClient` 收不到，所以没有任何一条测试看得见服务端记了什么。③是因为出错时程序从 `for` 里直接跳去 `except`，循环后面那一行走不到；正常结束时它倒是执行了，但那时没有异常可贴
 - **修复**：没修。要让测试管日志，可以用 pytest 自带的 `caplog` 夹具拿到日志记录再断言（这个仓库还没用过，后面的课补）
 - **教训**：①**改了测试管不到的那一层，测试全绿不说明任何事**，得起服务亲眼看一次 ②"不报错"和"干了它该干的事"是两回事：②③都不报错，只是日志记错了地方 ③和 P011–P015 是同一家族。这个家族的共同点是：有一层东西（客人听到什么、模型说没说完、服务端记了什么）在测试的视野之外。每加一层，就问一句"这层谁在看着"
+
+## P017 · 2026-11-27 · 字段名写死、店规忘了 `join`：100 条测试照样全绿，只有真调用才露馅
+
+- **现象**：`ask_json` 里拼店规的那一行有两种写错，在副本里各改一处实测：①`fields = "city、unit"`（字段名写死，不从表格上读）②`fields = model.model_fields`（忘了 `"、".join`）。两种写法 `tests/test_structured.py` 都是 `10 passed`、全量 `100 passed`。真跑验收脚本（各 2 遍，逐字相同）：①问"上海天气怎么样"照常填对，问"三乘以七等于多少"（表格是 `CalcQuery`）报 `expression: Field required`：店规里只写了 `city、unit`，模型根本不知道有 `expression` 这一格；②不报错，但输出和预期对不上：第一行单位从 `摄氏度` 变成 `celsius`，第二行回 `CalcQuery(expression='3*7')`。因为发出去的店规是 `字段：{'city': FieldInfo(annotation=str, required=True), 'unit': FieldInfo(annotation=str, required=False, default='celsius')}`，120 个字符的字段清单里带着 `default='celsius'`，模型照着它填了
+- **根因**：规格里的 `FakeSend` 只看得见**发出去的请求体**，而规格对店规的断言是 `"city" in rule["content"] and "unit" in rule["content"]`（`test_ask_json_sends_json_mode_and_field_names`）。写死的两个字段名过得了；那段 `FieldInfo` 的文字里恰好也有 `city` 和 `unit` 这两个词，同样过得了。4 条 `ask_json` 的测试用的又都是 `WeatherQuery` 一张表，没有一条换一张表
+- **修复**：没修（代码本身是对的，这是规格的盲区）。要堵上，加一条测试换一张表（比如 `CalcQuery`），断言店规里有 `expression`、没有 `city`；或者直接断言店规整句等于 `只输出一个 JSON 对象，不要解释。字段：city、unit`
+- **教训**：①`in` 这种断言太松：它只说"这个词在"，不说"这个词是怎么来的"。要防"写死"，就让测试换一个输入，看输出跟着变 ②出现"测试全绿 + 真调用结果不对"，先把发出去的请求体原样打印出来看，这次是店规里混进了 120 个字符的程序内部表示 ③和 P011–P016 是同一家族，盲区换到了"提示词长什么样"这一层
 
