@@ -40,13 +40,13 @@ uv sync
 uv run uvicorn p1_fc_agent.app:app --port 8000
 ```
 
-另开一个终端，问 Agent 一个问题。`-N` 关掉 curl 的缓冲，才能看到事件逐条到达：
+另开一个终端，问 Agent 一个问题。`-N` 关掉 curl 的缓冲，才能看到事件逐条到达；`X-API-Key` 是 W2-S2 的查卡，key 读的是环境变量 `P1_API_KEY`，没设时默认是 `dev-key`：
 
 ```bash
-curl -N -X POST http://127.0.0.1:8000/ask -H "Content-Type: application/json" -d '{"question":"北京和上海今天的气温相差多少度？"}'
+curl -N -X POST http://127.0.0.1:8000/ask -H "X-API-Key: dev-key" -H "Content-Type: application/json" -d '{"question":"北京和上海今天的气温相差多少度？"}'
 ```
 
-Agent 每走一步，就推一条 SSE 事件：`step`（Thought + Action）、`observation`（工具结果）、`final`（最终答案），最后一条 `done` 表示流结束。
+Agent 每走一步，就推一条 SSE 事件：`step`（Thought + Action）、`observation`（工具结果）、`final`（最终答案）。中途出错会推一条 `error`，最后一条 `done` 表示流结束。
 
 ## 接口一览
 
@@ -57,7 +57,7 @@ Agent 每走一步，就推一条 SSE 事件：`step`（Thought + Action）、`o
 | GET | /tools/{tool_name} | 查工具的参数 Schema（W2-S2） |
 | POST | /calculator | 四则运算，需要请求头 `X-API-Key`（W2-S2） |
 | POST | /stream | 把一段文字逐字推流（W2-S3） |
-| POST | /ask | ReAct Agent：流式返回每一步 Thought/Action/Observation（W2 周末） |
+| POST | /ask | ReAct Agent：流式返回每一步 Thought/Action/Observation（W2 周末），需要请求头 X-API-Key（W3）。 |
 
 ## 真模型调用（W3）
 
