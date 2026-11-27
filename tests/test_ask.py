@@ -38,6 +38,13 @@ from p1_fc_agent.react_loop import react_events, run_react
 
 QUESTION = "北京和上海今天的气温相差多少度？"
 
+TEST_KEY = "test-key"
+GOOD_HEADERS = {"X-API-Key": TEST_KEY}
+
+
+@pytest.fixture(autouse=True)
+def fixed_api_key(monkeypatch):
+    monkeypatch.setenv("P1_API_KEY", TEST_KEY)
 
 @pytest.fixture
 def client():
@@ -100,7 +107,7 @@ def test_ask_stream_is_progressive(client):
     共 9 条，第 1 条 0.05 秒到，最后一条 0.35 秒到（留余量断言 0.25）"""
     stamps = []
     t0 = time.perf_counter()
-    with client.stream("POST", "/ask", json={"question": QUESTION}) as r:
+    with client.stream("POST", "/ask", json={"question": QUESTION}, headers=GOOD_HEADERS) as r:
         for line in r.iter_lines():
             if line.startswith("data: "):
                 stamps.append(time.perf_counter() - t0)
@@ -112,14 +119,14 @@ def test_ask_stream_is_progressive(client):
 # ---------- B. /ask 的协议 ----------
 
 def test_ask_headers(client):
-    r = client.post("/ask", json={"question": QUESTION})
+    r = client.post("/ask", json={"question": QUESTION}, headers=GOOD_HEADERS)
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("text/event-stream")
     assert r.headers["cache-control"] == "no-cache"
 
 
 def test_ask_event_sequence(client):
-    events = parse_events(client.post("/ask", json={"question": QUESTION}).text)
+    events = parse_events(client.post("/ask", json={"question": QUESTION}, headers=GOOD_HEADERS).text)
     assert [e["type"] for e in events] == [
         "step", "observation", "step", "observation",
         "step", "observation", "step", "final", "done",
@@ -129,17 +136,17 @@ def test_ask_event_sequence(client):
 
 def test_ask_events_match_loop(client):
     """线上推的每一条，和循环内部记的逐条相等"""
-    events = parse_events(client.post("/ask", json={"question": QUESTION}).text)
+    events = parse_events(client.post("/ask", json={"question": QUESTION}, headers=GOOD_HEADERS).text)
     assert events[:-1] == asyncio.run(run_react(QUESTION)).events
     assert events[-2]["text"] == "北京和上海今天的气温相差 8 度。"
 
 
 def test_ask_rejects_bad_request(client):
-    blank = client.post("/ask", json={"question": "   "})
+    blank = client.post("/ask", json={"question": "   "}, headers=GOOD_HEADERS)
     assert blank.status_code == 422 and "message" in blank.json()
-    extra = client.post("/ask", json={"question": QUESTION, "delay": 0})
+    extra = client.post("/ask", json={"question": QUESTION, "delay": 0}, headers=GOOD_HEADERS)
     assert extra.status_code == 422
-    missing = client.post("/ask", json={})
+    missing = client.post("/ask", json={}, headers=GOOD_HEADERS)
     assert missing.status_code == 422
 
 

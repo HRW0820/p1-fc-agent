@@ -10,10 +10,12 @@ from fastapi import Request
 from fastapi.responses import StreamingResponse
 from p1_fc_agent.sse import sse, token_stream
 from p1_fc_agent.react_loop import react_events, mock_llm
-
+import logging    
 
 
 app = FastAPI(title="demo")
+logging.basicConfig(level=logging.INFO)                           # 给日志装一个"写到终端"的出口
+logger = logging.getLogger(__name__)                              # 这个文件自己的记录本
 
 @app.get("/health")          # 菜单上挂一道菜：GET 方法的 /health
 async def health():          # 谁做这道菜：这个函数
@@ -117,12 +119,15 @@ class AskRequest(BaseModel):
     
 async def ask_stream(question: str, *, brain=mock_llm):
     """把循环的每一条事件包成一条 SSE。brain 可以换：W3 换真模型只改这里"""
-    async for event in react_events(question, brain=brain):     # 边跑边拿
-        yield sse(event)                                          # 包好，递到传送带上
-    yield sse({"type": "done"})                                  # 收尾：菜上齐了                            # 收尾：菜上齐了
-
+    try:
+        async for event in react_events(question, brain=brain):     # 边跑边拿
+            yield sse(event)                                          # 包好，递到传送带上
+    except Exception:                                                 # 流中途出错：客人要听到一句话
+        logger.exception("/ask 的流中断了")                           # 经过和 traceback 进日志，不给客人
+        yield sse({"type": "error", "message": "输出中断，请重试"})
+    yield sse({"type": "done"})                                      # 收尾：出了错也要有 done
 
 @app.post("/ask")
-async def ask(req: AskRequest):
+async def ask(req: AskRequest, _: None = Depends(require_api_key)):
     return StreamingResponse(ask_stream(req.question), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache"})
