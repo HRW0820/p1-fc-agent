@@ -61,7 +61,9 @@ Agent 每走一步，就推一条 SSE 事件：`step`（Thought + Action）、`o
 
 ## 真模型调用（W3）
 
-`src/p1_fc_agent/llm.py` 是调 DeepSeek 的最小封装：`load_api_key()` 读 key，`chat(messages)` 发一段对话并返回 `(回复, 用量, finish_reason)`，`cost(usage)` 按空闲时段单价算出这次调用花了多少元。单价来自 DeepSeek 官方价格页，高峰时段（工作日 9-12 点、14-18 点）是两倍。
+`src/p1_fc_agent/llm.py` 是调 DeepSeek 的最小封装：`load_api_key()` 读 key，`chat(messages)` 发一段对话并返回 `(回复, 用量, finish_reason, tool_calls)`，`cost(usage)` 按空闲时段单价算出这次调用花了多少元。单价来自 DeepSeek 官方价格页，高峰时段（工作日 9-12 点、14-18 点）是两倍。
+
+`calling.py` 是 Function Calling 的核心：`tool_spec` 把表格写成说明书，`decide` 让模型挑表，`ask` 走完一轮（挑表 → 执行 → 回传 → 总结）。
 
 结构化输出在 `src/p1_fc_agent/structured.py`：`ask_json(messages, 表格)` 让模型按一张 Pydantic 表格回答（打开 JSON 模式），`parse(text, 表格)` 把回答变成对象。回答不是 JSON、表格没填对、话说一半被掐断，都报 `ParseError`，报错信息是一句能照着做的话。
 
