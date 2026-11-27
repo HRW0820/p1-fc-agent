@@ -86,7 +86,7 @@ def test_chat_passes_options_through():
 
 def test_chat_returns_text_and_usage():
     fake = FakeSend(reply="长城是横亘中国")
-    text, usage, finish_reason = chat_with(fake, [{"role": "user", "content": "用一句话介绍长城"}])
+    text, usage, finish_reason, _ = chat_with(fake, [{"role": "user", "content": "用一句话介绍长城"}])
     assert text == "长城是横亘中国"
     assert usage == {"prompt_tokens": 13, "completion_tokens": 1, "prompt_cache_hit_tokens": 0}
     assert finish_reason == "stop"                              # W3-S2 补：这一项以前在 chat 里丢了（P015）
@@ -112,7 +112,7 @@ def test_cost_with_peak_price():
 
 def test_chat_reports_finish_reason():
     fake = FakeSend(reply="", finish="length")                  # 话说到一半被掐断
-    text, usage, finish_reason = chat_with(fake, [{"role": "user", "content": "用一句话介绍长城"}])
+    text, usage, finish_reason, _ = chat_with(fake, [{"role": "user", "content": "用一句话介绍长城"}])
     assert (text, finish_reason) == ("", "length")
 
 

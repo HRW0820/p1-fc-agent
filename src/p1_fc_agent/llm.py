@@ -26,15 +26,18 @@ async def post(payload: dict) -> dict:
 
 
 async def chat(messages: list[dict], *, send=post, max_tokens: int = 256, temperature: float = 0.0,
-               response_format: dict | None = None):
-    """发一段对话，返回 (回复文本, 用量, finish_reason)。send 可以换成假的：测试不花钱"""
+               response_format: dict | None = None, tools: list | None = None):
+    """发一段对话，返回 (回复文本, 用量, finish_reason, tool_calls)。send 可以换成假的：测试不花钱"""
     payload = {"model": MODEL, "messages": messages, "max_tokens": max_tokens,
     "temperature": temperature, "thinking": {"type": "disabled"}}     # 关思考：只要回答，不要思考过程
     if response_format:
         payload["response_format"] = response_format      # 要 JSON 模式才带上；不带时请求体还是 W3-S1 的五样
+    if tools:
+        payload["tools"] = tools                          # 工具说明书：不带时请求体和以前一模一样
     data = await send(payload)
-    choice = data["choices"][0]                       # 回执里的那条回复：内容、为什么停，都在它上面
-    return choice["message"]["content"], data["usage"], choice["finish_reason"]
+    message = data["choices"][0]["message"]               # 回执里的那条回复：内容、为什么停、要调谁，都在它上面
+    finish_reason = data["choices"][0]["finish_reason"]
+    return message["content"], data["usage"], finish_reason, message.get("tool_calls") or []   # 没调工具时是空列表
 
 def cost(usage: dict, price: dict = PRICE) -> float:
     """这次调用花了多少元。usage 就是响应里的用量"""

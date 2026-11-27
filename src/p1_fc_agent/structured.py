@@ -26,7 +26,7 @@ async def ask_json(messages: list[dict], model, *, send=llm.post, max_tokens: in
     """让模型按 model 这张表格回答，返回 (填好的表格, 用量)。send 可以换成假的"""
     fields = "、".join(model.model_fields)                # 字段名从表格上读，不手写：表格改了，店规跟着改
     rule = {"role": "system", "content": f"只输出一个 JSON 对象，不要解释。字段：{fields}"}
-    text, usage, finish_reason = await llm.chat([rule] + messages, send=send, max_tokens=max_tokens,
+    text, usage, finish_reason, _ = await llm.chat([rule] + messages, send=send, max_tokens=max_tokens,
                                                 response_format=JSON_MODE)
     if finish_reason != "stop":                         # P015 的欠账：话没说完，JSON 一定是断的，别拿去解析
         raise ParseError(f"模型的回答没说完（finish_reason={finish_reason}），JSON 是断的")
