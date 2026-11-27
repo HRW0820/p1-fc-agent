@@ -10,7 +10,7 @@ from fastapi import Request
 from fastapi.responses import StreamingResponse
 from p1_fc_agent.sse import sse, token_stream
 from p1_fc_agent.react_loop import react_events, mock_llm
-import logging    
+import logging
 
 
 app = FastAPI(title="demo")
