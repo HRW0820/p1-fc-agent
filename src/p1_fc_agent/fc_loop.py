@@ -1,5 +1,6 @@
 """FC 版 ReAct 循环：没有 Thought / Action / Final Answer，也没有正则。模型递卡就是要用工具，不递卡就是在回答"""
 from p1_fc_agent import llm
+from p1_fc_agent.budget import OverBudget
 from p1_fc_agent.calling import ParseError, read_call, run, tool_spec
 
 MAX_STEPS = 8                           # 保险丝：最多问模型几轮
@@ -13,15 +14,25 @@ def execute(call: dict, models: list):
     except ParseError as e:             # 填错了：原因当结果递回去，模型下一轮自己改
         return call["function"]["name"], str(e)
 
-async def react_events(question: str, models: list, *, send=llm.post, max_steps: int = MAX_STEPS, temperature: float = 0.0):
-    """每发生一件事就 yield 一条。一轮 = 问模型一次 + 把它递的卡挨个执行、挨个递回去"""
+async def react_events(question: str, models: list, *, send=llm.post, max_steps: int = MAX_STEPS, temperature: float = 0.0,
+                       budget=None):
+    """每发生一件事就 yield 一条。一轮 = 问模型一次 + 把它递的卡挨个执行、挨个递回去。budget 给了就记账，钱超了不再打电话"""
     messages = [{"role": "user", "content": question}]
     tools = [tool_spec(m) for m in models]
     for step in range(1, max_steps + 1):
-        content, _, _, calls = await llm.chat(messages, tools=tools, send=send, temperature=temperature)
+        content, usage, _, calls = await llm.chat(messages, tools=tools, send=send, temperature=temperature)
+        reason = ""                    # 非空 = 钱超了
+        if budget:
+            try:
+                budget.charge(usage)   # 每打完一次电话记一笔，最后一次也记：账要记全
+            except OverBudget as e:
+                reason = str(e)
         yield {"type": "step", "step": step, "text": content}
-        if not calls:                   # 没递卡：这段话就是最终回答
+        if not calls:                  # 没递卡：这段话就是最终回答（钱超了也照常交付：活已经干完了）
             yield {"type": "final", "step": step, "text": content}
+            return
+        if reason:                     # 钱超了，模型还要用工具：不再打电话，用账单代替答案
+            yield {"type": "final", "step": step, "text": f"[预算用完] {reason} —— 这一轮之后不再打电话"}
             return
         messages.append({"role": "assistant", "content": content, "tool_calls": calls})
         for call in calls:              # 一轮递了几张卡，就挨个执行、挨个递回去
