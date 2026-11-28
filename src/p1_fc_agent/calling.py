@@ -38,11 +38,13 @@ async def decide(question: str, models: list, **options) -> list:
 
 
 def run(query) -> str:
-    """执行一张填好的表格，返回一段文字。今天只有计算器是真的，天气和人口先放假话"""
+    """执行一张填好的表格，返回一段文字。计算器是真的；天气查一本假账本；人口先放假话"""
     if isinstance(query, CalcQuery):
         return run_calculator(query.expression)
     if isinstance(query, WeatherQuery):
-        return f"{query.city}今天晴，12{'°C' if query.unit == 'celsius' else '°F'}"
+        weather = {"北京": 12, "上海": 20, "广州": 25}       # 假账本，和 W2 的 get_weather 同一本
+        temp = weather.get(query.city)
+        return f"{query.city}今天晴，{temp}°C" if temp is not None else f"未知城市：{query.city}"
     return f"{query.city}人口约 2487 万"
 
 
