@@ -65,7 +65,9 @@ Agent 每走一步，就推一条 SSE 事件：`step`（Thought + Action）、`o
 
 `calling.py` 是 Function Calling 的核心：`tool_spec` 把表格写成说明书，`decide` 让模型挑表，`ask` 走完一轮（挑表 → 执行 → 回传 → 总结）。
 
-`fc_loop.py` 是 FC 版 ReAct 循环：`execute` 执行一张卡，`react_events` 一轮一轮问模型、把它递的每张卡执行完再递回去，`run_react` 只要最后那句回答。
+`fc_loop.py` 是 FC 版 ReAct 循环：`execute` 执行一张卡，`react_events` 一轮一轮问模型、把它递的每张卡执行完再递回去，`run_react` 只要最后那句回答。`react_events` 还收一个 `temperature`（默认 0.0）。
+
+`experiments/w3_compare.py` 是 W3 的对照实验脚本：同一个问题分别跑文本协议（`react_loop` + 真模型大脑）和 Function Calling（`fc_loop`），各跑 10 遍，比 `temperature=0` 和 `0.7`。真调模型，结果在同目录的三个 `w3_compare_results*.json` 里，报告见《W3-对照实验报告.md》。
 
 结构化输出在 `src/p1_fc_agent/structured.py`：`ask_json(messages, 表格)` 让模型按一张 Pydantic 表格回答（打开 JSON 模式），`parse(text, 表格)` 把回答变成对象。回答不是 JSON、表格没填对、话说一半被掐断，都报 `ParseError`，报错信息是一句能照着做的话。
 
