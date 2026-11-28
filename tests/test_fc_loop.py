@@ -162,3 +162,15 @@ def test_run_looks_up_a_fake_weather_db():
     assert calling.run(WeatherQuery(city="上海")) == "上海今天晴，20°C"
     assert calling.run(WeatherQuery(city="北京")) == "北京今天晴，12°C"
     assert calling.run(WeatherQuery(city="深圳")) == "未知城市：深圳"
+
+
+# ---------- temperature：对照实验要换温度（W3-S5） ----------
+
+def test_temperature_is_passed_to_every_call():
+    fake = scripted()
+    asyncio.run(fc_loop.run_react(QUESTION, TOOLS, send=fake))
+    assert [p["temperature"] for p in fake.payloads] == [0.0] * 4        # 不传就是 0.0
+
+    fake = scripted()
+    asyncio.run(fc_loop.run_react(QUESTION, TOOLS, send=fake, temperature=0.7))
+    assert [p["temperature"] for p in fake.payloads] == [0.7] * 4        # 每一次电话都带着

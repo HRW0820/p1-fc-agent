@@ -13,12 +13,12 @@ def execute(call: dict, models: list):
     except ParseError as e:             # 填错了：原因当结果递回去，模型下一轮自己改
         return call["function"]["name"], str(e)
 
-async def react_events(question: str, models: list, *, send=llm.post, max_steps: int = MAX_STEPS):
+async def react_events(question: str, models: list, *, send=llm.post, max_steps: int = MAX_STEPS, temperature: float = 0.0):
     """每发生一件事就 yield 一条。一轮 = 问模型一次 + 把它递的卡挨个执行、挨个递回去"""
     messages = [{"role": "user", "content": question}]
     tools = [tool_spec(m) for m in models]
     for step in range(1, max_steps + 1):
-        content, _, _, calls = await llm.chat(messages, tools=tools, send=send)
+        content, _, _, calls = await llm.chat(messages, tools=tools, send=send, temperature=temperature)
         yield {"type": "step", "step": step, "text": content}
         if not calls:                   # 没递卡：这段话就是最终回答
             yield {"type": "final", "step": step, "text": content}
