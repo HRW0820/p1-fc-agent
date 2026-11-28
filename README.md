@@ -65,7 +65,9 @@ Agent 每走一步，就推一条 SSE 事件：`step`（Thought + Action）、`o
 
 `calling.py` 是 Function Calling 的核心：`tool_spec` 把表格写成说明书，`decide` 让模型挑表，`ask` 走完一轮（挑表 → 执行 → 回传 → 总结）。
 
-`fc_loop.py` 是 FC 版 ReAct 循环：`execute` 执行一张卡，`react_events` 一轮一轮问模型、把它递的每张卡执行完再递回去，`run_react` 只要最后那句回答。`react_events` 还收一个 `temperature`（默认 0.0）。
+`fc_loop.py` 是 FC 版 ReAct 循环：`execute` 执行一张卡，`react_events` 一轮一轮问模型、把它递的每张卡执行完再递回去，`run_react` 只要最后那句回答。`react_events` 还收一个 `temperature`（默认 0.0）和一个 `budget`（可以不传）。
+
+`budget.py` 是单次会话的账本：`Budget(limit_yuan=…)` 每打完一次电话 `charge(usage)` 记一笔（次数、输入输出 token、花了多少元），`report()` 出账单；累计超过上限时 `charge` 抛 `OverBudget`。`fc_loop.react_events` 接了账本以后，钱超了就不再打下一次电话：模型这次还要用工具就停，用账单代替答案；这次已经给出答案就照常交付。上限是打完电话才检查的，所以最多会超一次电话的钱。单价默认是空闲时段的，高峰时段要传翻倍的 `price`。
 
 `experiments/w3_compare.py` 是 W3 的对照实验脚本：同一个问题分别跑文本协议（`react_loop` + 真模型大脑）和 Function Calling（`fc_loop`），各跑 10 遍，比 `temperature=0` 和 `0.7`。真调模型，结果在同目录的三个 `w3_compare_results*.json` 里，报告见《W3-对照实验报告.md》。
 
