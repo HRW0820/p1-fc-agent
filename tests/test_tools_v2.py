@@ -21,18 +21,13 @@ from p1_fc_agent.tools import (
 
 # ---------- 1. Field 约束 ----------
 
-def test_population_must_be_positive():
-    """value 必须是正整数（gt=0）：0 和负数都拒收。"""
-    p = PopulationQuery(city="北京", value=2189)
-    assert p.value == 2189
+def test_population_only_asks_for_city():
+    """W4-S1 改：人口数不让模型填（P018），参数表里只剩 city；多填的 value 被拒收。"""
+    assert PopulationQuery(city="北京").city == "北京"
 
     with pytest.raises(ValidationError) as exc:
-        PopulationQuery(city="北京", value=0)
-    assert exc.value.errors()[0]["type"] == "greater_than"
-
-    with pytest.raises(ValidationError) as exc:
-        PopulationQuery(city="北京", value=-5)
-    assert exc.value.errors()[0]["type"] == "greater_than"
+        PopulationQuery(city="北京", value=2189)
+    assert exc.value.errors()[0]["type"] == "extra_forbidden"
 
 
 # ---------- 2. min_length + 字符集校验器 ----------

@@ -61,7 +61,7 @@ def test_chat_returns_tool_calls():
 
 def test_tool_spec_has_name_description_and_schema():
     spec = calling.tool_spec(WeatherQuery)
-    assert spec == {"type": "function", "function": {"name": "WeatherQuery", "description": "",
+    assert spec == {"type": "function", "function": {"name": "WeatherQuery", "description": WeatherQuery.__doc__,
                                                      "parameters": WeatherQuery.model_json_schema()}}
 
 
